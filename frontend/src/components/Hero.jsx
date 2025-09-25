@@ -1,10 +1,12 @@
+import React, { useState } from "react";
 import ArrowSvg from "../assets/arrow-right-thin-svgrepo-com.svg";
 import HowItWorks from "../assets/HowItWorks.svg";
 import FeatureCards from "./FeatureCards";
 import LanguageSwitcher from "./LanguageSwitcher";
+import Signup from "./Signup";
 
 const Hero = () => {
- 
+  const [isSignupOpen, setIsSignupOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -12,7 +14,10 @@ const Hero = () => {
       <nav className="flex justify-between items-center px-8 py-4 mb-15">
         <div className="text-xl font-medium text-gray-900">Archon </div>
         <div className="flex items-center space-x-4">
-          <button className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors border border-gray-300 rounded-full shadow-sm hover:shadow-md cursor-pointer">
+          <button
+            onClick={() => setIsSignupOpen(true)}
+            className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors border border-gray-300 rounded-full shadow-sm hover:shadow-md cursor-pointer"
+          >
             Login/Sign Up
           </button>
           <div className="flex items-center space-x-2">
@@ -83,14 +88,17 @@ const Hero = () => {
 
           {/* Search Bar */}
           <div className="mt-12">
-            <div className="relative max-w-md mx-auto">
+            <div
+              className="relative mx-auto"
+              style={{ width: "403px", height: "56px" }}
+            >
               <input
                 type="text"
                 placeholder="Ask me anything..."
-                className="w-full px-6 py-4 text-gray-300 bg-gray-900 rounded-full border-none outline-none text-lg"
+                className="w-full h-full px-6 text-white bg-gray-900 rounded-full border-none outline-none text-base placeholder-gray-400 shadow-lg focus:shadow-xl transition-shadow duration-300"
               />
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex space-x-2">
-                <button className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors">
+                <button className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors shadow-md">
                   <svg
                     className="w-4 h-4 text-white"
                     fill="none"
@@ -105,7 +113,7 @@ const Hero = () => {
                     />
                   </svg>
                 </button>
-                <button className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors">
+                <button className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors shadow-md">
                   <svg
                     className="w-4 h-4 text-white"
                     fill="none"
@@ -116,7 +124,7 @@ const Hero = () => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                      d="M5 10l7-7m0 0l7 7m-7-7v18"
                     />
                   </svg>
                 </button>
@@ -139,7 +147,7 @@ const Hero = () => {
       <div className="flex  items-center justify-center mb-30">
         <img src={HowItWorks} alt="" />
       </div>
-      
+
       {/* Build by students bla bla */}
       <div className="flex justify-center items-center space-x-4 mb-[100px]">
         <span className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full text-sm font-medium">
@@ -155,7 +163,6 @@ const Hero = () => {
         </span>
       </div>
 
-
       {/* Ready to get your doubts cleared */}
       <div className="flex justify-center items-center space-x-6 py-16 bg-gray-50 mb-[100px]">
         <p className="text-xl text-gray-800 italic">
@@ -165,6 +172,9 @@ const Hero = () => {
           Start chatting now →
         </button>
       </div>
+
+      {/* Signup Modal */}
+      <Signup isOpen={isSignupOpen} onClose={() => setIsSignupOpen(false)} />
     </div>
   );
 };
