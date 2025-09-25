@@ -1,14 +1,26 @@
-langchain
-langchain-openai
-openai
-chromadb
+# Core server
 fastapi
-uvicorn
-python-dotenv
-langchain_chroma
-langchain_ollama
-docling
+uvicorn[standard]
 python-multipart
+python-dotenv
+
+# LangChain + Vector DB
+langchain
+langchain-community
+langchain-ollama
+chromadb
+
+# PDF processing
+pdfplumber
 PyPDF2
-langchain_community
-pdfplumber2
+
+# Whisper STT (GPU accelerated)
+openai-whisper
+torch
+torchaudio
+
+# TTS
+gTTS
+
+# Utils
+requests
