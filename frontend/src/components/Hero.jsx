@@ -48,16 +48,16 @@ const Hero = () => {
       <div className="flex-1 flex items-center justify-center px-8">
         <div className="max-w-4xl mx-auto text-center relative">
           {/* Decorative Labels */}
-          <div className="absolute -top-16 left-0 text-gray-400 text-lg font-light italic transform -rotate-12">
+          <div className="absolute -top-16 left-0 text-gray-700 text-2xl font-light italic transform -rotate-12">
             Smart
           </div>
-          <div className="absolute -top-8 right-16 text-gray-400 text-sm border border-gray-300 rounded-full px-3 py-1">
+          <div className="absolute -top-22 right-10 text-gray-700 text-2xl border border-gray-600 rounded-full px-3 py-1">
             LANGUAGE AGNOSTIC AI
           </div>
-          <div className="absolute -bottom-16 right-0 text-gray-400 text-lg font-light italic transform rotate-12">
+          <div className="absolute -bottom-16 right-0 text-gray-700 text-2xl font-light italic transform rotate-12">
             Contextual
           </div>
-          <div className="absolute -bottom-20 left-8 text-gray-400 text-lg font-light italic transform -rotate-6">
+          <div className="absolute -bottom-10 left-8 text-gray-700 text-2xl font-light italic transform -rotate-6">
             Guide
           </div>
 
