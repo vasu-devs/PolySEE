@@ -11,16 +11,15 @@ import {
   Download,
   Settings,
 } from "lucide-react";
-import Dashboard from "./Dashboard";
 
-export default function DashboardLayout() {
+export default function UserchatPage() {
   const [isExpanded, setIsExpanded] = useState(true);
 
   const sidebarItems = [
     { name: "Analytics", icon: BarChart3 },
     { name: "Test Chatbot", icon: MessageSquare },
     { name: "Policies", icon: FileText },
-    {name : "Real chat", icon: MessageSquare}
+    { name: "Real chat", icon: MessageSquare },
   ];
 
   const recentActivities = [
@@ -139,7 +138,7 @@ export default function DashboardLayout() {
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 pl-10">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700">
             <Download size={16} />
             Export Data
@@ -149,7 +148,7 @@ export default function DashboardLayout() {
         {/* Main Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Side - Upload Section */}
-          <div className="space-y-6 pl-10">
+          <div className="space-y-6">
             {/* Upload Area */}
             <div className="bg-gray-200 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
               <div className="flex flex-col items-center">
@@ -198,7 +197,7 @@ export default function DashboardLayout() {
           </div>
 
           {/* Right Side - Stats and Activity */}
-          <Dashboard />
+          
         </div>
       </main>
     </div>

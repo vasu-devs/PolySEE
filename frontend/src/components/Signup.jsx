@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import StudentBlackPanel from "./StudentBlackPanel";
 import AdminBlackPanel from "./AdminBlackPanel";
@@ -32,7 +32,7 @@ const Signup = ({ isOpen, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/10 backdrop-blur-[2px] flex items-center justify-center z-50"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -43,7 +43,7 @@ const Signup = ({ isOpen, onClose }) => {
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-50"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-50 cursor-pointer"
         >
           ✕
         </button>
@@ -54,7 +54,9 @@ const Signup = ({ isOpen, onClose }) => {
           <motion.div
             layout
             transition={{ duration: 0.6, ease: "easeInOut" }}
-            className={`w-1/2 relative ${isBlackLeft ? "order-1" : "order-2"} z-20`}
+            className={`w-1/2 relative ${
+              isBlackLeft ? "order-1" : "order-2"
+            } z-20`}
           >
             <div className="absolute inset-0 bg-gray-900 text-white flex flex-col justify-center">
               <BlackPanel onSwitch={handleSwitch} />
@@ -65,7 +67,9 @@ const Signup = ({ isOpen, onClose }) => {
           <motion.div
             layout
             transition={{ duration: 0.6, ease: "easeInOut" }}
-            className={`w-1/2 relative ${isBlackLeft ? "order-2" : "order-1"} z-10`}
+            className={`w-1/2 relative ${
+              isBlackLeft ? "order-2" : "order-1"
+            } z-10`}
           >
             <div className="absolute inset-0 bg-white flex flex-col justify-center">
               <WhitePanel
