@@ -1,70 +1,20 @@
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET;
 
-// Authentication middleware with role-based access control
-const auth = (allowedRoles = []) => {
+module.exports = function (requiredRoles = []) {
   return (req, res, next) => {
+    const auth = req.headers.authorization;
+    if (!auth) return res.status(401).json({ error: "no token" });
+    const token = auth.split(" ")[1];
     try {
-      // Check for authorization header
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({
-          success: false,
-          message: "Access denied. No token provided.",
-        });
-      }
-
-      // Extract token
-      const token = authHeader.split(" ")[1];
-      if (!token) {
-        return res.status(401).json({
-          success: false,
-          message: "Access denied. Invalid token format.",
-        });
-      }
-
-      // Verify token
       const payload = jwt.verify(token, JWT_SECRET);
-
-      // Check if user role is allowed
-      if (allowedRoles.length > 0 && !allowedRoles.includes(payload.role)) {
-        return res.status(403).json({
-          success: false,
-          message: `Access denied. Required role: ${allowedRoles.join(" or ")}`,
-        });
+      if (requiredRoles.length && !requiredRoles.includes(payload.role)) {
+        return res.status(403).json({ error: "forbidden" });
       }
-
-      // Attach user info to request
-      req.user = {
-        userId: payload.userId,
-        regNo: payload.regNo,
-        role: payload.role,
-      };
-
+      req.user = payload; // { regNo, role, iat, exp }
       next();
-    } catch (error) {
-      console.error("Auth middleware error:", error);
-
-      if (error.name === "JsonWebTokenError") {
-        return res.status(401).json({
-          success: false,
-          message: "Access denied. Invalid token.",
-        });
-      }
-
-      if (error.name === "TokenExpiredError") {
-        return res.status(401).json({
-          success: false,
-          message: "Access denied. Token expired.",
-        });
-      }
-
-      return res.status(401).json({
-        success: false,
-        message: "Access denied. Token verification failed.",
-      });
+    } catch (err) {
+      return res.status(401).json({ error: "invalid token" });
     }
   };
 };
-
-module.exports = auth;
