@@ -32,15 +32,11 @@ const StudentBlackPanel = ({ onSwitch }) => {
             <span className="w-1.5 h-1.5 bg-white rounded-full mr-3 flex-shrink-0"></span>
             Voice input capabilities
           </li>
-          <li className="flex items-center text-gray-300">
-            <span className="w-1.5 h-1.5 bg-white rounded-full mr-3 flex-shrink-0"></span>
-            Chat history and bookmarks
-          </li>
         </ul>
 
         <button 
           onClick={onSwitch}
-          className="bg-white text-gray-900 px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-sm"
+          className="bg-white text-gray-900 px-22 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors text-sm cursor-pointer"
         >
           Switch to Admin Portal
         </button>

@@ -43,7 +43,7 @@ const StudentWhitePanel = ({
         </div>
         <button
           type="submit"
-          className="w-full bg-gray-900 text-white py-2.5 rounded-lg font-semibold hover:bg-gray-800 transition-colors text-sm"
+          className="w-full bg-gray-900 text-white py-2.5 rounded-lg font-semibold hover:bg-gray-800 transition-colors text-sm cursor-pointer"
         >
           Sign in
         </button>
