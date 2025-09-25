@@ -21,9 +21,11 @@ app.use((req, res, next) => {
 });
 
 // Database connection
-const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/archon_db";
+const MONGO_URI =
+  process.env.MONGO_URI || "mongodb://localhost:27017/archon_db";
 
-mongoose.connect(MONGO_URI)
+mongoose
+  .connect(MONGO_URI)
   .then(() => {
     console.log("✅ MongoDB connected");
   })
@@ -36,7 +38,7 @@ app.get("/health", (req, res) => {
   res.json({
     success: true,
     message: "Server is running",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -47,7 +49,7 @@ app.use("/api", apiRoutes);
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: "Route not found"
+    message: "Route not found",
   });
 });
 
@@ -56,7 +58,7 @@ app.use((error, req, res, next) => {
   console.error("Error:", error);
   res.status(500).json({
     success: false,
-    message: "Internal server error"
+    message: "Internal server error",
   });
 });
 
