@@ -11,3 +11,4 @@ docling
 python-multipart
 PyPDF2
 langchain_community
+pdfplumber2
