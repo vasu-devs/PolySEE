@@ -20,6 +20,7 @@ export default function DashboardLayout() {
     { name: "Analytics", icon: BarChart3 },
     { name: "Test Chatbot", icon: MessageSquare },
     { name: "Policies", icon: FileText },
+    {name : "Real chat", icon: MessageSquare}
   ];
 
   const recentActivities = [
@@ -46,8 +47,8 @@ export default function DashboardLayout() {
         className={`fixed left-0 top-0 h-full bg-black text-white flex flex-col z-50 transition-all duration-300 ease-in-out
           ${
             isExpanded
-              ? "w-64 translate-x-0"
-              : "w-64 -translate-x-full lg:w-20 lg:translate-x-0"
+              ? "w-50 translate-x-0"
+              : "w-50 -translate-x-full lg:w-20 lg:translate-x-0"
           }`}
       >
         {/* Sidebar Header */}
