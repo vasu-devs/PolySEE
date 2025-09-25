@@ -1,5 +1,5 @@
 //This is the main layout component with sidebar and main content are for admin dashboard upload and stats
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Menu,
   ChevronLeft,
@@ -10,8 +10,11 @@ import {
   Upload,
   Download,
   Settings,
+  CheckCircle2,
 } from "lucide-react";
 import Dashboard from "./Dashboard";
+
+const API_BASE = "http://127.0.0.1:8000";
 
 export default function DashboardLayout() {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -20,7 +23,7 @@ export default function DashboardLayout() {
     { name: "Analytics", icon: BarChart3 },
     { name: "Test Chatbot", icon: MessageSquare },
     { name: "Policies", icon: FileText },
-    {name : "Real chat", icon: MessageSquare}
+    { name: "Real chat", icon: MessageSquare },
   ];
 
   const recentActivities = [
@@ -31,6 +34,82 @@ export default function DashboardLayout() {
     { name: "Sample_doc.pdf", time: "2 mins ago" },
     { name: "Sample_doc.pdf", time: "2 mins ago" },
   ];
+
+  // Upload state
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [completed, setCompleted] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file && file.name.toLowerCase().endsWith(".pdf")) {
+      setSelectedFile(file);
+      setProgress(0);
+      setCompleted(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.toLowerCase().endsWith(".pdf")) {
+      setSelectedFile(file);
+      setProgress(0);
+      setCompleted(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+    setProgress(10);
+
+    try {
+      const form = new FormData();
+      form.append("file", selectedFile);
+
+      const res = await fetch(`${API_BASE}/upload_pdf_async`, {
+        method: "POST",
+        body: form,
+      });
+      const body = await res.json();
+      const upload_id = body.upload_id;
+
+      // Poll for status
+      const poll = setInterval(async () => {
+        const statusRes = await fetch(`${API_BASE}/upload_status/${upload_id}`);
+        const status = await statusRes.json();
+
+        if (status.status === "processing") {
+          setProgress((prev) => Math.min(prev + 20, 80));
+        }
+        if (status.status === "completed") {
+          clearInterval(poll);
+          setProgress(100);
+          setUploading(false);
+          setCompleted(true);
+
+          // Reset after green tick
+          setTimeout(() => {
+            setSelectedFile(null);
+            setCompleted(false);
+            setProgress(0);
+          }, 2000);
+        }
+        if (status.status === "error") {
+          clearInterval(poll);
+          setUploading(false);
+          setProgress(0);
+          alert("Upload failed: " + (status.error || "unknown error"));
+        }
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="relative  bg-gray-100">
@@ -61,7 +140,7 @@ export default function DashboardLayout() {
             MyApp
           </span>
 
-          {/* Toggle Button - only show on larger screens and when expanded */}
+          {/* Toggle Button */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className={`pr-5 pt-2 pb-2 pl-2 cursor-pointer rounded-md hover:bg-gray-800 transition-all duration-300 ${
@@ -83,10 +162,7 @@ export default function DashboardLayout() {
                 key={item.name}
                 className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-gray-800 rounded-md cursor-pointer mx-2"
               >
-                <IconComponent
-                  size={22}
-                  className="text-white shrink-0" // icon stays same size
-                />
+                <IconComponent size={22} className="text-white shrink-0" />
                 <span
                   className={`transition-all duration-300 ${
                     isExpanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
@@ -151,19 +227,70 @@ export default function DashboardLayout() {
           {/* Left Side - Upload Section */}
           <div className="space-y-6 pl-10">
             {/* Upload Area */}
-            <div className="bg-gray-200 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-              <div className="flex flex-col items-center">
-                <Upload className="w-8 h-8 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Drop your PDF files here or browse
-                </h3>
-                <p className="text-sm text-gray-500 mb-6">
-                  Max file size up to 50MB
-                </p>
-                <button className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800">
-                  Upload PDF
-                </button>
-              </div>
+            <div
+              onClick={() => inputRef.current.click()}
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all
+                ${
+                  completed
+                    ? "bg-green-100 border-green-400"
+                    : "bg-gray-200 border-gray-300 hover:border-gray-400"
+                }`}
+            >
+              {completed ? (
+                <div className="flex flex-col items-center">
+                  <CheckCircle2 className="w-12 h-12 text-green-600 animate-bounce mb-2" />
+                  <p className="text-green-700 font-medium">
+                    Uploaded & Embedded!
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <Upload className="w-8 h-8 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    {selectedFile
+                      ? selectedFile.name
+                      : "Drop your PDF files here or click to browse"}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Max file size up to 50MB
+                  </p>
+
+                  {selectedFile && !uploading && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpload();
+                      }}
+                      className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800"
+                    >
+                      Upload
+                    </button>
+                  )}
+
+                  {uploading && (
+                    <div className="w-full mt-4">
+                      <div className="w-full bg-gray-300 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-sm text-gray-600">
+                        Uploading... {progress}%
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              <input
+                ref={inputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
             </div>
 
             {/* Guidelines */}
@@ -187,11 +314,9 @@ export default function DashboardLayout() {
                   Processing Info
                 </h4>
                 <ul className="text-sm text-gray-700 space-y-1">
-                  <li>
-                    • Documents are automatically chunked for optimal retrieval
-                  </li>
+                  <li>• Documents are automatically chunked</li>
                   <li>• Processing time varies by document size</li>
-                  <li>• Files are immediately available after processing</li>
+                  <li>• Files are available after embedding</li>
                 </ul>
               </div>
             </div>

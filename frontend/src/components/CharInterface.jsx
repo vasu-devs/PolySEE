@@ -1,10 +1,10 @@
 // src/components/ChatInterface.jsx
 import React, { useState, useRef } from 'react';
 import { Bell, FileText, Settings, Info } from 'lucide-react';
-import sendIcon from '../icons/send.svg';
-import voiceIcon from '../icons/voice_mode.svg';
-import dexterIcon from '../icons/dexter.svg';
-import micIcon from '../icons/microphone.svg';
+import sendIcon from 'E:/INNERSIH/frontend/icons/send.svg';
+import voiceIcon from 'E:/INNERSIH/frontend/icons/voice_mode.svg';
+import dexterIcon from 'E:/INNERSIH/frontend/icons/dexter.svg';
+import micIcon from 'E:/INNERSIH/frontend/icons/microphone.svg';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -221,6 +221,9 @@ const ChatInterface = () => {
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
+                        h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-3" {...props} />,
+                        h2: ({node, ...props}) => <h2 className="text-xl font-semibold mt-4 mb-2" {...props} />,
+                        h3: ({node, ...props}) => <h3 className="text-lg font-medium mt-3 mb-1" {...props} />,
                         ul: ({ node, ...props }) => (
                           <ul className="list-disc list-inside space-y-1" {...props} />
                         ),
@@ -236,6 +239,7 @@ const ChatInterface = () => {
                         p: ({ node, ...props }) => (
                           <p className="mb-2" {...props} />
                         ),
+                        hr: () => <hr className="my-4 border-gray-300" />,
                       }}
                     >
                       {msg.text}

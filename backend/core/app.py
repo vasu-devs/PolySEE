@@ -88,11 +88,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
-
-
-
 # -------------------- MODELS --------------------
 class ChatRequest(BaseModel):
     message: str
@@ -170,6 +165,7 @@ def embed_and_store_fast(chunks: List[str], metadata: Optional[List[Dict]] = Non
 def create_college_context_prompt(query: str, department: str) -> str:
     return f"""
     You are a helpful college assistant specializing in {department}.
+    You respond in the same language as the query is asked in
     Department Context: {department}
     Student Question: {query}
     """
@@ -186,11 +182,9 @@ def get_qa_chain(k: int = DEFAULT_K, chain_type: str = "stuff"):
     _qa_instances[cache_key] = qa
     return qa
 
-
 @app.get("/health")
 def health():
     return {"status": "ok", "vectorstore_loaded": _vectorstore is not None}
-
 
 # -------------------- STARTUP --------------------
 @app.on_event("startup")
@@ -241,16 +235,12 @@ async def chat_with_assistant(payload: ChatRequest = Body(...)):
         elapsed_seconds=round(elapsed, 3)
     )
 
-
-
-
 @app.post("/chat_stream")
 async def chat_stream(payload: ChatRequest = Body(...)):
     query = create_college_context_prompt(payload.message, payload.department)
     qa = get_qa_chain(k=payload.k or DEFAULT_K, chain_type=payload.chain_type)
 
     def event_stream():
-        # Step 1: retrieval
         retriever = qa.retriever
         docs = retriever.get_relevant_documents(query)
         yield json.dumps({"type": "status", "message": "📚 Retrieved documents"}) + "\n"
@@ -258,26 +248,20 @@ async def chat_stream(payload: ChatRequest = Body(...)):
             preview = d.page_content[:120].replace("\n", " ")
             yield json.dumps({"type": "doc", "source": d.metadata.get("source"), "preview": preview}) + "\n"
 
-        # Step 2: thinking
         yield json.dumps({"type": "status", "message": "🤔 Generating answer..."}) + "\n"
 
-        # Step 3: generate response (fake streaming here)
         result = qa.invoke({"query": query})
         text = result.get("result", "")
         for word in text.split():
             yield json.dumps({"type": "token", "text": word + " "}) + "\n"
 
-        # Step 4: done
         yield json.dumps({"type": "done"}) + "\n"
 
     return StreamingResponse(event_stream(), media_type="application/json")
 
-
-
 # -------------------- ADMIN CHAT --------------------
 @app.post("/admin_chat", response_model=ChatResponse)
 async def admin_chat(payload: ChatRequest = Body(...)):
-    """Admin chat ignores approval filter and can query all docs"""
     start = time.time()
     query = create_college_context_prompt(payload.message, payload.department)
     qa = get_qa_chain(k=payload.k or DEFAULT_K, chain_type=payload.chain_type)
@@ -308,7 +292,7 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     metadata = [{"source": file.filename, "chunk_id": i} for i in range(len(chunks))]
     embed_and_store_fast(chunks, metadata)
-    _doc_approval_status[file.filename] = False  # uploaded but not approved
+    _doc_approval_status[file.filename] = False
 
     try: temp_path.unlink()
     except: pass
@@ -384,27 +368,40 @@ def test_retrieval(request: ChatRequest):
     }
 
 # -------------------- VOICE CHAT --------------------
+import torch
+
 @app.post("/voice_chat")
 async def voice_chat(file: UploadFile = File(...)):
-    """Voice input → RAG → voice output"""
-    audio_path = Path(TEMP_MD_DIR) / file.filename
+    # Save audio safely with a temp filename
+    audio_path = Path(tempfile.mktemp(suffix=".wav"))
     audio_path.write_bytes(await file.read())
 
-    model = whisper.load_model("base").to("cuda")
+    # Pick device automatically
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"🔥 Using device: {device}")
+
+    # Load Whisper model
+    model = whisper.load_model("base").to(device)
+
+    # Transcribe
     result = model.transcribe(str(audio_path))
     query = result["text"]
 
     qa = get_qa_chain()
     response = qa.invoke({"query": query})["result"]
 
+    # TTS response
     tts = gTTS(response)
     out_path = Path(tempfile.mktemp(suffix=".mp3"))
     tts.save(out_path)
 
-    try: audio_path.unlink()
-    except: pass
+    try:
+        audio_path.unlink()
+    except:
+        pass
 
     return FileResponse(out_path, media_type="audio/mpeg", filename="response.mp3")
+
 
 # -------------------- RUN --------------------
 if __name__ == "__main__":
