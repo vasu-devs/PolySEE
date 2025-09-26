@@ -19,7 +19,7 @@ const FileMetaSchema = new Schema({
 
 const UserSchema = new Schema({
   regNo: { type: String, unique: true },
-  passwordHash: String, // bcrypt hash expected
+  password: { type: String, required: true },
   role: { type: String, enum: ["user", "admin"], default: "user" },
   recentChats: [ChatSchema],
   uploadedFiles: [FileMetaSchema],

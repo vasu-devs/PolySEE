@@ -2,12 +2,14 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const devRoutes = require('./routes/dev');
 
 const authRoutes = require("./routes/auth");
 const apiRoutes = require("./routes/api"); // protected user/admin endpoints
 
 const app = express();
 app.use(express.json());
+
 
 // allow only the frontend origin
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN, credentials: true }));
@@ -22,6 +24,6 @@ mongoose
 
 app.use("/auth", authRoutes);
 app.use("/api", apiRoutes);
-
+app.use('/api/dev', devRoutes);
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log("Express listening on", PORT));

@@ -1,9 +1,8 @@
-# app.py - College Assistant RAG Backend (SIH Final Version)
+# app.py - College Assistant RAG Backend (SIH + Gemini Flash + Google Voice, Full Version)
 
 from dotenv import load_dotenv
 load_dotenv()
 import json
-from fastapi.responses import StreamingResponse
 import os
 import time
 import re
@@ -14,25 +13,19 @@ import tempfile
 import asyncio
 import warnings
 
-import time
-from fastapi.responses import StreamingResponse
-
 from fastapi import FastAPI, HTTPException, Body, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 import uvicorn
 
-# LangChain
+# LangChain (for RAG vectorstore)
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import OllamaEmbeddings
-from langchain_ollama import OllamaLLM
-from langchain.chains import RetrievalQA
-from fastapi.responses import StreamingResponse
 
-# Speech libs
-import whisper
-from gtts import gTTS
+# Google AI SDKs
+import google.generativeai as genai
+
 
 # PDF loaders
 try:
@@ -69,11 +62,15 @@ os.makedirs(TEMP_MD_DIR, exist_ok=True)
 
 executor = ThreadPoolExecutor(max_workers=4)
 
+# Gemini + Google Clients
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+GEMINI_MODEL = "gemini-2.0-flash"
+
 # -------------------- FASTAPI --------------------
 app = FastAPI(
-    title="College Assistant RAG API (SIH Final Version)",
-    version="6.0",
-    description="RAG backend with admin approval workflow, student chat, and voice chat"
+    title="College Assistant RAG API (SIH + Gemini + Google Voice)",
+    version="8.0",
+    description="RAG backend with admin approval, student chat, streaming chat, and Google voice chat"
 )
 app.add_middleware(
     CORSMiddleware,
@@ -93,7 +90,6 @@ class ChatRequest(BaseModel):
     message: str
     department: Optional[str] = "General"
     k: Optional[int] = DEFAULT_K
-    chain_type: Optional[str] = "stuff"
 
 class ChatResponse(BaseModel):
     response: str
@@ -108,7 +104,6 @@ class UploadResponse(BaseModel):
 
 # -------------------- GLOBALS --------------------
 _vectorstore = None
-_qa_instances = {}
 upload_progress = {}
 _doc_approval_status: Dict[str, bool] = {}
 
@@ -164,27 +159,32 @@ def embed_and_store_fast(chunks: List[str], metadata: Optional[List[Dict]] = Non
 
 def create_college_context_prompt(query: str, department: str) -> str:
     return f"""
-    You are a helpful college assistant specializing in {department}.
-    You respond in the same language as the query is asked in
-    Department Context: {department}
+    You are a knowledgeable and authoritative college assistant specializing in {department}.
+    Your job is to answer student questions about college rules, regulations, and policies.
+
+    IMPORTANT:
+    - Always give a clear, direct, and complete answer.
+    - Never respond with "tell me more" or "which library"—assume the context is THIS COLLEGE.
+    - Base your answers on the college’s policies and common academic practices.
+    - Respond in the same language as the student's last question.
+
     Student Question: {query}
     """
 
-def get_qa_chain(k: int = DEFAULT_K, chain_type: str = "stuff"):
-    if _vectorstore is None:
-        raise HTTPException(status_code=500, detail="Vectorstore empty. Upload docs first.")
-    cache_key = f"{chain_type}::k={k}"
-    if cache_key in _qa_instances:
-        return _qa_instances[cache_key]
-    retriever = _vectorstore.as_retriever(search_kwargs={"k": k})
-    llm = OllamaLLM(model="llama3:8b", temperature=0)
-    qa = RetrievalQA.from_chain_type(llm=llm, retriever=retriever, chain_type=chain_type, return_source_documents=True)
-    _qa_instances[cache_key] = qa
-    return qa
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "vectorstore_loaded": _vectorstore is not None}
+
+async def run_gemini(query: str) -> str:
+    model = genai.GenerativeModel(GEMINI_MODEL)
+    resp = model.generate_content(query)
+    return resp.text if resp and resp.text else "No response generated."
+
+# -------------------- GLOBALS --------------------
+_vectorstore = None
+upload_progress = {}
+_doc_approval_status: Dict[str, bool] = {}
+_chat_history: Dict[str, List[Dict[str, str]]] = {}
+  # user_id -> [{"role": "user/assistant", "content": "..."}]
+
 
 # -------------------- STARTUP --------------------
 @app.on_event("startup")
@@ -197,12 +197,16 @@ def startup_event():
     except Exception as e:
         print(f"❌ Failed to load vectorstore: {e}")
         _vectorstore = None
-    _ = OllamaLLM(model="llama3:8b", temperature=0)
-    print("🔥 Models preloaded. API Ready!")
+    print("🔥 Gemini + Google Voice backend ready!")
+
+# -------------------- HEALTH --------------------
+@app.get("/health")
+def health():
+    return {"status": "ok", "vectorstore_loaded": _vectorstore is not None}
 
 # -------------------- STUDENT CHAT --------------------
 @app.post("/chat", response_model=ChatResponse)
-async def chat_with_assistant(payload: ChatRequest = Body(...)):
+async def chat_with_assistant(payload: ChatRequest = Body(...), user_id: str = "default"):
     if _vectorstore is None:
         return ChatResponse(
             response="Vectorstore not initialized. Upload some PDFs first or call /test_retrieval.",
@@ -210,50 +214,73 @@ async def chat_with_assistant(payload: ChatRequest = Body(...)):
             sources=[],
             elapsed_seconds=0.0,
         )
-    start = time.time()
-    query = create_college_context_prompt(payload.message, payload.department)
-    qa = get_qa_chain(k=payload.k or DEFAULT_K, chain_type=payload.chain_type)
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, qa.invoke, {"query": query})
-    start = time.time()
-    query = create_college_context_prompt(payload.message, payload.department)
-    qa = get_qa_chain(k=payload.k or DEFAULT_K, chain_type=payload.chain_type)
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, qa.invoke, {"query": query})
 
-    # filter: only approved docs
-    approved_docs = []
-    for doc in result.get("source_documents", []):
-        if _doc_approval_status.get(doc.metadata.get("source"), False):
-            approved_docs.append(doc)
+    # init history for this user
+    if user_id not in _chat_history:
+        _chat_history[user_id] = []
+
+    # add current user query to history
+    _chat_history[user_id].append({"role": "student", "content": payload.message})
+
+    # build conversation text
+    conversation = "\n".join(
+        [f"{msg['role'].capitalize()}: {msg['content']}" for msg in _chat_history[user_id]]
+    )
+
+    prompt = f"""
+    The following is a conversation between a student and a helpful college assistant specializing in {payload.department}.
+    You must maintain context across turns.
+    Always respond in the same language as the student's last question.
+    Always assume the student is asking about THIS college.
+
+    Conversation so far:
+    {conversation}
+
+    Assistant:
+    """
+
+    start = time.time()
+    result_text = await run_gemini(prompt)
+
+    # save assistant reply to history
+    _chat_history[user_id].append({"role": "assistant", "content": result_text})
+
+    # keep history manageable (last 10 exchanges)
+    _chat_history[user_id] = _chat_history[user_id][-20:]
+
+    # retrieve sources
+    retriever = _vectorstore.as_retriever(search_kwargs={"k": payload.k or DEFAULT_K})
+    docs = retriever.get_relevant_documents(payload.message)
+    approved = [d for d in docs if _doc_approval_status.get(d.metadata.get("source"), False)]
 
     elapsed = time.time() - start
     return ChatResponse(
-        response=result.get("result", ""),
+        response=result_text,
         department=payload.department,
-        sources=[{"source": d.metadata.get("source")} for d in approved_docs],
+        sources=[{"source": d.metadata.get("source")} for d in approved],
         elapsed_seconds=round(elapsed, 3)
     )
+
 
 @app.post("/chat_stream")
 async def chat_stream(payload: ChatRequest = Body(...)):
     query = create_college_context_prompt(payload.message, payload.department)
-    qa = get_qa_chain(k=payload.k or DEFAULT_K, chain_type=payload.chain_type)
 
     def event_stream():
-        retriever = qa.retriever
-        docs = retriever.get_relevant_documents(query)
-        yield json.dumps({"type": "status", "message": "📚 Retrieved documents"}) + "\n"
+        retriever = _vectorstore.as_retriever(search_kwargs={"k": payload.k or DEFAULT_K})
+        docs = retriever.get_relevant_documents(payload.message)
+        yield json.dumps({"type": "status", "message": "📚 searching documents"}) + "\n"
         for d in docs:
             preview = d.page_content[:120].replace("\n", " ")
             yield json.dumps({"type": "doc", "source": d.metadata.get("source"), "preview": preview}) + "\n"
 
         yield json.dumps({"type": "status", "message": "🤔 Generating answer..."}) + "\n"
 
-        result = qa.invoke({"query": query})
-        text = result.get("result", "")
-        for word in text.split():
-            yield json.dumps({"type": "token", "text": word + " "}) + "\n"
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(query, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield json.dumps({"type": "token", "text": chunk.text}) + "\n"
 
         yield json.dumps({"type": "done"}) + "\n"
 
@@ -264,14 +291,16 @@ async def chat_stream(payload: ChatRequest = Body(...)):
 async def admin_chat(payload: ChatRequest = Body(...)):
     start = time.time()
     query = create_college_context_prompt(payload.message, payload.department)
-    qa = get_qa_chain(k=payload.k or DEFAULT_K, chain_type=payload.chain_type)
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, qa.invoke, {"query": query})
+    result_text = await run_gemini(query)
+
+    retriever = _vectorstore.as_retriever(search_kwargs={"k": payload.k or DEFAULT_K})
+    docs = retriever.get_relevant_documents(payload.message)
+
     elapsed = time.time() - start
     return ChatResponse(
-        response=result.get("result", ""),
+        response=result_text,
         department=payload.department,
-        sources=[{"source": d.metadata.get("source")} for d in result.get("source_documents", [])],
+        sources=[{"source": d.metadata.get("source")} for d in docs],
         elapsed_seconds=round(elapsed, 3)
     )
 
@@ -299,7 +328,6 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     return UploadResponse(message="Upload successful (awaiting approval)", num_chunks=len(chunks), stored_at=PERSIST_DIR)
 
-# Async ingestion
 async def process_pdf_background(upload_id: str, file_content: bytes, filename: str):
     try:
         temp_path = Path(TEMP_MD_DIR) / filename
@@ -368,40 +396,48 @@ def test_retrieval(request: ChatRequest):
     }
 
 # -------------------- VOICE CHAT --------------------
-import torch
+# @app.post("/voice_chat")
+# async def voice_chat(file: UploadFile = File(...)):
+#     audio_path = Path(tempfile.mktemp(suffix=".wav"))
+#     audio_path.write_bytes(await file.read())
 
-@app.post("/voice_chat")
-async def voice_chat(file: UploadFile = File(...)):
-    # Save audio safely with a temp filename
-    audio_path = Path(tempfile.mktemp(suffix=".wav"))
-    audio_path.write_bytes(await file.read())
+#     # Speech-to-Text (Google)
+#     with open(audio_path, "rb") as f:
+#         audio = speech.RecognitionAudio(content=f.read())
 
-    # Pick device automatically
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"🔥 Using device: {device}")
+#     config = speech.RecognitionConfig(
+#         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+#         sample_rate_hertz=16000,
+#         language_code="pa-IN",  # can change dynamically
+#     )
 
-    # Load Whisper model
-    model = whisper.load_model("base").to(device)
+#     response = speech_client.recognize(config=config, audio=audio)
+#     query = " ".join([r.alternatives[0].transcript for r in response.results])
 
-    # Transcribe
-    result = model.transcribe(str(audio_path))
-    query = result["text"]
+#     if not query.strip():
+#         return {"error": "No speech recognized"}
 
-    qa = get_qa_chain()
-    response = qa.invoke({"query": query})["result"]
+#     # RAG + Gemini
+#     result_text = await run_gemini(query)
 
-    # TTS response
-    tts = gTTS(response)
-    out_path = Path(tempfile.mktemp(suffix=".mp3"))
-    tts.save(out_path)
+#     # TTS response (Google)
+#     synthesis_input = texttospeech.SynthesisInput(text=result_text)
+#     voice = texttospeech.VoiceSelectionParams(
+#         language_code="pa-IN", ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
+#     )
+#     audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
 
-    try:
-        audio_path.unlink()
-    except:
-        pass
+#     tts_response = tts_client.synthesize_speech(
+#         input=synthesis_input, voice=voice, audio_config=audio_config
+#     )
 
-    return FileResponse(out_path, media_type="audio/mpeg", filename="response.mp3")
+#     out_path = Path(tempfile.mktemp(suffix=".mp3"))
+#     out_path.write_bytes(tts_response.audio_content)
 
+#     try: audio_path.unlink()
+#     except: pass
+
+#     return FileResponse(out_path, media_type="audio/mpeg", filename="response.mp3")
 
 # -------------------- RUN --------------------
 if __name__ == "__main__":

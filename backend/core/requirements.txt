@@ -7,20 +7,16 @@ python-dotenv
 # LangChain + Vector DB
 langchain
 langchain-community
-langchain-ollama
 chromadb
+
+# Google AI SDKs
+google-generativeai
+google-cloud-speech
+google-cloud-texttospeech
 
 # PDF processing
 pdfplumber
 PyPDF2
-
-# Whisper STT (GPU accelerated)
-openai-whisper
-torch
-torchaudio
-
-# TTS
-gTTS
 
 # Utils
 requests
