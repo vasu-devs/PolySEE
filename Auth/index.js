@@ -4,7 +4,8 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 
 const authRoutes = require("./routes/auth");
-const apiRoutes = require("./routes/api"); // protected user/admin endpoints
+const apiRoutes = require("./routes/api"); // protected user/admin 
+const requestLogger = require("./middleware/loggerMiddleware"); //For logging
 
 const app = express();
 app.use(express.json());
@@ -22,6 +23,7 @@ mongoose
 
 app.use("/auth", authRoutes);
 app.use("/api", apiRoutes);
+app.use(requestLogger); //Log route middleware
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log("Express listening on", PORT));

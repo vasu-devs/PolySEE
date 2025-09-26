@@ -394,6 +394,16 @@ def test_retrieval(request: ChatRequest):
             for d in docs
         ]
     }
+@app.get("/documents")
+def list_documents():
+    docs = []
+    for filename, approved in _doc_approval_status.items():
+        docs.append({
+            "name": filename,
+            "status": "verified" if approved else "processing"
+        })
+    return docs
+
 
 # -------------------- VOICE CHAT --------------------
 # @app.post("/voice_chat")

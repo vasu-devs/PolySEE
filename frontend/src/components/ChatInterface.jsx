@@ -10,10 +10,12 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import sendIcon from "../../icons//send.svg";
+import sendIcon from "../../icons/send.svg";
 import voiceIcon from "../../icons/voice_mode.svg";
 import dexterIcon from "../../icons/dexter.svg";
 import micIcon from "../../icons/microphone.svg";
+import newChatIcon from "../../icons/newchat.svg";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -34,7 +36,6 @@ const ChatInterface = () => {
   const scrollToBottom = () => {
     if (chatContainerRef.current) {
       const container = chatContainerRef.current;
-      // Get the actual height of the input bar for accurate padding
       const inputBarHeight = inputBarRef.current?.offsetHeight || 96;
       container.scrollTo({
         top: container.scrollHeight - container.clientHeight + inputBarHeight,
@@ -43,7 +44,6 @@ const ChatInterface = () => {
     }
   };
 
-  // Auto-scroll whenever messages change
   useEffect(() => {
     if (currentView === "chatting") {
       const timer = setTimeout(scrollToBottom, 50);
@@ -51,45 +51,36 @@ const ChatInterface = () => {
     }
   }, [messages, thinking, currentView]);
 
-  // Logout function
+  // Logout
   const handleLogout = () => {
-    // Clear localStorage
     localStorage.removeItem("authToken");
     localStorage.removeItem("userRole");
     localStorage.removeItem("userRegNo");
-
-    // Navigate to landing page
     navigate("/");
   };
 
-  // Navigate to dashboard (for admin users)
   const handleGoToDashboard = () => {
     navigate("/dashboard");
   };
 
-  // Check if current user is admin
   const isAdmin = localStorage.getItem("userRole") === "admin";
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (!event.target.closest(".profile-dropdown")) {
         setShowProfileDropdown(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle window resize to recalculate scroll position
   useEffect(() => {
     const handleResize = () => {
       if (currentView === "chatting") {
         setTimeout(scrollToBottom, 100);
       }
     };
-
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [currentView]);
@@ -103,20 +94,34 @@ const ChatInterface = () => {
     setInputValue("");
     setCurrentView("chatting");
 
-    // Auto-scroll after adding user message
     setTimeout(scrollToBottom, 100);
 
-    // Add placeholder bot message
     const botIndex = messages.length + 1;
     setMessages((prev) => [...prev, { type: "bot", text: "" }]);
     setThinking([]);
 
     try {
+      const department = localStorage.getItem("userDept") || "General";
+      const userId = localStorage.getItem("userRegNo") || "default";
+      const token = localStorage.getItem("authToken");
+
       const res = await fetch("http://127.0.0.1:8000/chat_stream", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          message: userMessage,
+          department,
+          k: 5,
+          user_id: userId,
+        }),
       });
+
+      if (!res.ok || !res.body) {
+        throw new Error("Backend not reachable");
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -132,10 +137,7 @@ const ChatInterface = () => {
           const evt = JSON.parse(line);
 
           if (evt.type === "status") {
-            setThinking((prev) => [
-              ...prev,
-              { kind: "status", text: evt.message },
-            ]);
+            setThinking((prev) => [...prev, { kind: "status", text: evt.message }]);
           } else if (evt.type === "doc") {
             setThinking((prev) => [
               ...prev,
@@ -146,17 +148,17 @@ const ChatInterface = () => {
             setMessages((prev) =>
               prev.map((m, i) => (i === botIndex ? { ...m, text: botText } : m))
             );
-            // Auto-scroll as bot types
             scrollToBottom();
           } else if (evt.type === "done") {
-            setThinking([]); // clear trace after final answer
+            setThinking([]);
           }
         }
       }
     } catch (err) {
+      console.error("Chat error:", err);
       setMessages((prev) =>
         prev.map((m, i) =>
-          i === botIndex ? { ...m, text: "❌ Error connecting to backend." } : m
+          i === botIndex ? { ...m, text: "⚠️ Error connecting to backend." } : m
         )
       );
       setThinking([]);
@@ -188,20 +190,21 @@ const ChatInterface = () => {
           { type: "user", text: "🎤 (voice query sent)" },
         ]);
         setCurrentView("chatting");
-
-        // Auto-scroll after voice message
         setTimeout(scrollToBottom, 100);
 
         try {
+          const token = localStorage.getItem("authToken");
           const res = await fetch("http://127.0.0.1:8000/voice_chat", {
             method: "POST",
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: formData,
           });
 
           if (!res.ok) throw new Error("Voice chat failed");
           const audioBlobResp = await res.blob();
 
-          // Play response audio
           const audioURL = URL.createObjectURL(audioBlobResp);
           const audio = new Audio(audioURL);
           audio.play();
@@ -212,6 +215,7 @@ const ChatInterface = () => {
           ]);
           setTimeout(scrollToBottom, 100);
         } catch (err) {
+          console.error("Voice chat error:", err);
           setMessages((prev) => [
             ...prev,
             { type: "bot", text: "❌ Voice chat error." },
@@ -262,7 +266,6 @@ const ChatInterface = () => {
             <User size={20} className="text-white" />
           </button>
 
-          {/* Dropdown Menu */}
           {showProfileDropdown && (
             <div className="absolute right-0 top-12 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[160px] z-30">
               <div className="px-4 py-2 text-sm text-gray-600 border-b border-gray-100">
@@ -298,6 +301,23 @@ const ChatInterface = () => {
         <span className="text-sm font-medium">Dexter</span>
       </div>
 
+      {/* New Chat floating button (opposite Dexter) */}
+      <div
+        className="absolute top-1/3 left-0 flex items-center bg-white rounded-r-full shadow-md px-4 py-2 gap-2 z-10 cursor-pointer hover:bg-gray-50"
+        style={{ transform: "translateY(-50%)" }}
+        onClick={() => {
+          setMessages([]);
+          setThinking([]);
+          setInputValue("");
+          setCurrentView("welcome");
+        }}
+      >
+        <img src={newChatIcon} alt="New Chat" className="w-6 h-6" />
+        <span className="text-sm font-medium">New Chat</span>
+      </div>
+
+
+
       {/* Content Container */}
       <div className="flex-1 w-full max-w-4xl mx-auto flex flex-col relative min-h-0">
         {currentView === "welcome" ? (
@@ -324,22 +344,19 @@ const ChatInterface = () => {
             </div>
           </div>
         ) : (
-          /* Chat Messages Area */
           <div
             ref={chatContainerRef}
             className="flex-1 overflow-y-auto bg-gray-100 min-h-0"
             style={{
               backgroundColor: "#f3f4f6",
-              paddingBottom: "120px", // Space for fixed input
+              paddingBottom: "120px",
               paddingTop: "1rem",
               paddingLeft: "1.5rem",
               paddingRight: "1.5rem",
-              // Custom minimal scrollbar styles
               scrollbarWidth: "thin",
               scrollbarColor: "rgba(156, 163, 175, 0.3) transparent",
             }}
           >
-            {/* Chat messages */}
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -421,7 +438,6 @@ const ChatInterface = () => {
               </div>
             ))}
 
-            {/* Thinking trace (temporary) */}
             {thinking.length > 0 && (
               <div className="flex justify-start mb-4">
                 <div className="px-4 py-3 rounded-lg max-w-lg bg-yellow-50 text-gray-700 text-sm border border-yellow-200 shadow-sm">
@@ -436,7 +452,7 @@ const ChatInterface = () => {
           </div>
         )}
 
-        {/* Input bar - Fixed at bottom with proper positioning */}
+        {/* Input bar */}
         <div
           ref={inputBarRef}
           className="fixed bottom-0 left-0 right-0 bg-gray-100 border-t border-gray-200 z-30"
@@ -452,12 +468,11 @@ const ChatInterface = () => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
               />
-              {/* Action buttons - positioned inside input */}
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 items-center">
                 <button
                   className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors"
                   onClick={() => {
-                    /* Handle voice mode */
+                    /* Future voice mode button */
                   }}
                 >
                   <img src={voiceIcon} alt="Voice" className="w-6 h-6" />

@@ -23,81 +23,42 @@ const DocumentsList = () => {
   const API_BASE = "http://127.0.0.1:8000";
 
   // Fetch documents from backend
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/documents`);
-        if (response.ok) {
-          const data = await response.json();
-          setDocuments(data);
-        } else {
-          console.error("Failed to fetch documents");
-          // For now, use mock data if API fails
-          setDocuments(mockDocuments);
-        }
-      } catch (error) {
-        console.error("Error fetching documents:", error);
-        // Use mock data as fallback
-        setDocuments(mockDocuments);
-      } finally {
-        setLoading(false);
+  const fetchDocuments = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`${API_BASE}/documents`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Add some extra info for UI (size, date, etc.)
+        const enhanced = data.map((doc, idx) => ({
+          id: idx + 1,
+          name: doc.name,
+          size: doc.size || "—",
+          date: doc.date || new Date().toISOString().split("T")[0],
+          time: doc.time || new Date().toLocaleTimeString(),
+          status: doc.status,
+        }));
+        setDocuments(enhanced);
+      } else {
+        console.error("Failed to fetch documents");
       }
-    };
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDocuments();
+    // auto refresh every 5s
+    const interval = setInterval(fetchDocuments, 5000);
+    return () => clearInterval(interval);
   }, []);
-
-  // Mock data (fallback if API is not available)
-  const mockDocuments = [
-    {
-      id: 1,
-      name: "Hostel Rules 2024.docx",
-      date: "2025-09-01",
-      time: "10:34 AM",
-      size: "1.2 MB",
-      status: "verified",
-    },
-    {
-      id: 2,
-      name: "Exam_policy_2025.pdf",
-      date: "2025-09-01",
-      time: "10:34 AM",
-      size: "2.4 MB",
-      status: "verified",
-    },
-    {
-      id: 3,
-      name: "Fee_structure_2025.pdf",
-      date: "2025-09-01",
-      time: "10:34 AM",
-      size: "1.8 MB",
-      status: "processing",
-    },
-    {
-      id: 4,
-      name: "Library Late Fee Policy.pdf",
-      date: "2025-09-01",
-      time: "10:34 AM",
-      size: "1.2 MB",
-      status: "verified",
-    },
-    {
-      id: 5,
-      name: "Anti-Ragging Guidelines.pdf",
-      date: "2025-09-01",
-      time: "10:34 AM",
-      size: "3.1 MB",
-      status: "verified",
-    },
-    {
-      id: 6,
-      name: "Scholarship_guidelines.pdf",
-      date: "2025-09-01",
-      time: "10:34 AM",
-      size: "2.2 MB",
-      status: "processing",
-    },
-  ];
 
   // Navigation functions
   const handleLogout = () => {
@@ -131,15 +92,19 @@ const DocumentsList = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Delete document function
-  const handleDelete = async (documentId) => {
-    if (window.confirm("Are you sure you want to delete this document?")) {
+  // Delete document function (removes from vector DB via backend)
+  const handleDelete = async (filename) => {
+    if (window.confirm(`Are you sure you want to delete ${filename}?`)) {
       try {
-        const response = await fetch(`${API_BASE}/documents/${documentId}`, {
+        const token = localStorage.getItem("authToken");
+        const response = await fetch(`${API_BASE}/delete_doc/${filename}`, {
           method: "DELETE",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
         });
         if (response.ok) {
-          setDocuments(documents.filter((doc) => doc.id !== documentId));
+          setDocuments((prev) => prev.filter((doc) => doc.name !== filename));
         } else {
           alert("Failed to delete document");
         }
@@ -218,7 +183,6 @@ const DocumentsList = () => {
               </div>
             </button>
 
-            {/* Dropdown Menu */}
             {showProfileDropdown && (
               <div className="absolute right-0 top-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[200px] z-50">
                 <div className="px-4 py-2 text-sm text-gray-600 border-b border-gray-100">
@@ -261,7 +225,6 @@ const DocumentsList = () => {
       {/* Main Content */}
       <main className="p-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {/* Table Header */}
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <h2 className="text-lg font-semibold text-gray-900">
               All Uploaded Documents
@@ -298,10 +261,7 @@ const DocumentsList = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {documents.map((doc) => (
-                  <tr
-                    key={doc.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
+                  <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <FileText className="h-5 w-5 text-gray-400 mr-3" />
@@ -328,7 +288,7 @@ const DocumentsList = () => {
                           <Download size={16} />
                         </button>
                         <button
-                          onClick={() => handleDelete(doc.id)}
+                          onClick={() => handleDelete(doc.name)}
                           className="text-red-600 hover:text-red-800 p-1 rounded transition-colors"
                         >
                           <Trash2 size={16} />
@@ -341,7 +301,6 @@ const DocumentsList = () => {
             </table>
           </div>
 
-          {/* Empty State */}
           {documents.length === 0 && (
             <div className="text-center py-12">
               <FileText className="mx-auto h-12 w-12 text-gray-400" />

@@ -1,4 +1,4 @@
-//This is the main layout component with sidebar and main content are for admin dashboard upload and stats
+// src/components/DashboardLayout.jsx
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -74,8 +74,13 @@ export default function DashboardLayout() {
       const form = new FormData();
       form.append("file", selectedFile);
 
+      const token = localStorage.getItem("authToken");
+
       const res = await fetch(`${API_BASE}/upload_pdf_async`, {
         method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: form,
       });
       const body = await res.json();
@@ -83,7 +88,11 @@ export default function DashboardLayout() {
 
       // Poll for status
       const poll = setInterval(async () => {
-        const statusRes = await fetch(`${API_BASE}/upload_status/${upload_id}`);
+        const statusRes = await fetch(`${API_BASE}/upload_status/${upload_id}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         const status = await statusRes.json();
 
         if (status.status === "processing") {
@@ -94,6 +103,18 @@ export default function DashboardLayout() {
           setProgress(100);
           setUploading(false);
           setCompleted(true);
+
+          // Approve document after upload
+          try {
+            await fetch(`${API_BASE}/approve_doc/${selectedFile.name}`, {
+              method: "POST",
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            });
+          } catch (err) {
+            console.error("Approve failed:", err);
+          }
 
           // Reset after green tick
           setTimeout(() => {
@@ -117,12 +138,9 @@ export default function DashboardLayout() {
 
   // Logout function
   const handleLogout = () => {
-    // Clear localStorage
     localStorage.removeItem("authToken");
     localStorage.removeItem("userRole");
     localStorage.removeItem("userRegNo");
-
-    // Navigate to landing page
     navigate("/");
   };
 
@@ -159,7 +177,6 @@ export default function DashboardLayout() {
       >
         {/* Sidebar Header */}
         <div className="flex items-center justify-between p-4">
-          {/* App Title */}
           <span
             className={`font-bold text-lg transition-all duration-300
                ${isExpanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden"}`}
@@ -167,7 +184,6 @@ export default function DashboardLayout() {
             MyApp
           </span>
 
-          {/* Toggle Button */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className={`pr-5 pt-2 pb-2 pl-2 cursor-pointer rounded-md hover:bg-gray-800 transition-all duration-300 ${
@@ -191,6 +207,8 @@ export default function DashboardLayout() {
                 navigate("/analytics");
               } else if (item.name === "Policies") {
                 navigate("/policies");
+              } else if (item.name === "Test Chatbot") {
+                navigate("/verification"); // ✅ NEW: go to VerificationInterface
               }
             };
 
@@ -234,7 +252,6 @@ export default function DashboardLayout() {
             </div>
           </div>
 
-          {/* Dropdown Menu */}
           {showProfileDropdown && isExpanded && (
             <div className="absolute bottom-full left-4 right-4 mb-2 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
               <button
@@ -249,7 +266,6 @@ export default function DashboardLayout() {
         </div>
       </div>
 
-      {/* Toggle Button - Always visible */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="fixed top-4 left-4 z-50 p-2 bg-black text-white rounded-md hover:bg-gray-800 transition-colors duration-200 lg:hidden"
