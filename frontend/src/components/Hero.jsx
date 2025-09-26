@@ -53,16 +53,16 @@ const Hero = () => {
       <div className="flex-1 flex items-center justify-center px-8">
         <div className="max-w-4xl mx-auto text-center relative">
           {/* Decorative Labels */}
-          <div className="absolute -top-16 left-0 text-gray-700 text-2xl font-light italic transform -rotate-12">
+          <div className="absolute -top-16 left-0 text-gray-400 text-lg font-light italic transform -rotate-12">
             Smart
           </div>
-          <div className="absolute -top-22 right-10 text-gray-700 text-2xl border border-gray-600 rounded-full px-3 py-1">
+          <div className="absolute -top-8 right-16 text-gray-400 text-sm border border-gray-300 rounded-full px-3 py-1">
             LANGUAGE AGNOSTIC AI
           </div>
-          <div className="absolute -bottom-16 right-0 text-gray-700 text-2xl font-light italic transform rotate-12">
+          <div className="absolute -bottom-16 right-0 text-gray-400 text-lg font-light italic transform rotate-12">
             Contextual
           </div>
-          <div className="absolute -bottom-10 left-8 text-gray-700 text-2xl font-light italic transform -rotate-6">
+          <div className="absolute -bottom-20 left-8 text-gray-400 text-lg font-light italic transform -rotate-6">
             Guide
           </div>
 
@@ -88,17 +88,14 @@ const Hero = () => {
 
           {/* Search Bar */}
           <div className="mt-12">
-            <div
-              className="relative mx-auto"
-              style={{ width: "403px", height: "56px" }}
-            >
+            <div className="relative max-w-md mx-auto">
               <input
                 type="text"
                 placeholder="Ask me anything..."
-                className="w-full h-full px-6 text-white bg-gray-900 rounded-full border-none outline-none text-base placeholder-gray-400 shadow-lg focus:shadow-xl transition-shadow duration-300"
+                className="w-full px-6 py-4 text-gray-300 bg-gray-900 rounded-full border-none outline-none text-lg"
               />
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex space-x-2">
-                <button className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors shadow-md">
+                <button className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors">
                   <svg
                     className="w-4 h-4 text-white"
                     fill="none"
@@ -113,7 +110,7 @@ const Hero = () => {
                     />
                   </svg>
                 </button>
-                <button className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors shadow-md">
+                <button className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors">
                   <svg
                     className="w-4 h-4 text-white"
                     fill="none"
@@ -124,7 +121,7 @@ const Hero = () => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M5 10l7-7m0 0l7 7m-7-7v18"
+                      d="M19 14l-7 7m0 0l-7-7m7 7V3"
                     />
                   </svg>
                 </button>
