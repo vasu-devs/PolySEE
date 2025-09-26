@@ -32,7 +32,7 @@ const Signup = ({ isOpen, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black/10 backdrop-blur-[2px] flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -43,7 +43,7 @@ const Signup = ({ isOpen, onClose }) => {
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-50 cursor-pointer"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-50"
         >
           ✕
         </button>

@@ -4,10 +4,12 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 
 const authRoutes = require("./routes/auth");
-const userRoutes = require("./routes/user");
+const apiRoutes = require("./routes/api"); // protected user/admin endpoints
 
 const app = express();
 app.use(express.json());
+
+// allow only the frontend origin
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN, credentials: true }));
 
 mongoose
@@ -18,8 +20,8 @@ mongoose
   .then(() => console.log("Mongo connected"))
   .catch((err) => console.error("Mongo error", err));
 
-app.use("/auth", authRoutes); // /auth/register, /auth/login, /auth/me
-app.use("/api/user", userRoutes); // protected user routes (recent chats etc.)
+app.use("/auth", authRoutes);
+app.use("/api", apiRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log("Express listening on", PORT));
