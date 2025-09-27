@@ -12,12 +12,14 @@ from concurrent.futures import ThreadPoolExecutor
 import tempfile
 import asyncio
 import warnings
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Body, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 import uvicorn
+from fastapi.responses import PlainTextResponse
 
 # LangChain (for RAG vectorstore)
 from langchain_community.vectorstores import Chroma
@@ -25,7 +27,6 @@ from langchain_community.embeddings import OllamaEmbeddings
 
 # Google AI SDKs
 import google.generativeai as genai
-
 
 # PDF loaders
 try:
@@ -106,8 +107,19 @@ class UploadResponse(BaseModel):
 _vectorstore = None
 upload_progress = {}
 _doc_approval_status: Dict[str, bool] = {}
+_chat_history: Dict[str, List[Dict[str, str]]] = {}
+_activity_log: List[Dict[str, str]] = []  # recent activities
 
 # -------------------- UTILS --------------------
+def log_activity(message: str):
+    """Log an activity with timestamp."""
+    _activity_log.insert(0, {
+        "message": message,
+        "time": datetime.now(timezone.utc).strftime("%H:%M:%S")
+    })
+    if len(_activity_log) > 20:
+        _activity_log.pop()
+
 def extract_text_from_pdf(pdf_path: Path) -> str:
     if PDFPLUMBER_AVAILABLE:
         with pdfplumber.open(pdf_path) as pdf:
@@ -160,10 +172,10 @@ def embed_and_store_fast(chunks: List[str], metadata: Optional[List[Dict]] = Non
 def create_college_context_prompt(query: str, department: str) -> str:
     return f"""
     You are a knowledgeable and authoritative college assistant specializing in {department}.
-    Your job is to answer student questions about college rules, regulations, and policies.
+    Your job is to answer to the point student questions about college rules, regulations, and policies.
 
     IMPORTANT:
-    - Always give a clear, direct, and complete answer.
+    - Always give a clear, direct,to the point, and complete answer.
     - Never respond with "tell me more" or "which library"—assume the context is THIS COLLEGE.
     - Base your answers on the college’s policies and common academic practices.
     - Respond in the same language as the student's last question.
@@ -171,20 +183,10 @@ def create_college_context_prompt(query: str, department: str) -> str:
     Student Question: {query}
     """
 
-
-
 async def run_gemini(query: str) -> str:
     model = genai.GenerativeModel(GEMINI_MODEL)
     resp = model.generate_content(query)
     return resp.text if resp and resp.text else "No response generated."
-
-# -------------------- GLOBALS --------------------
-_vectorstore = None
-upload_progress = {}
-_doc_approval_status: Dict[str, bool] = {}
-_chat_history: Dict[str, List[Dict[str, str]]] = {}
-  # user_id -> [{"role": "user/assistant", "content": "..."}]
-
 
 # -------------------- STARTUP --------------------
 @app.on_event("startup")
@@ -215,14 +217,10 @@ async def chat_with_assistant(payload: ChatRequest = Body(...), user_id: str = "
             elapsed_seconds=0.0,
         )
 
-    # init history for this user
     if user_id not in _chat_history:
         _chat_history[user_id] = []
 
-    # add current user query to history
     _chat_history[user_id].append({"role": "student", "content": payload.message})
-
-    # build conversation text
     conversation = "\n".join(
         [f"{msg['role'].capitalize()}: {msg['content']}" for msg in _chat_history[user_id]]
     )
@@ -241,26 +239,21 @@ async def chat_with_assistant(payload: ChatRequest = Body(...), user_id: str = "
 
     start = time.time()
     result_text = await run_gemini(prompt)
-
-    # save assistant reply to history
     _chat_history[user_id].append({"role": "assistant", "content": result_text})
-
-    # keep history manageable (last 10 exchanges)
     _chat_history[user_id] = _chat_history[user_id][-20:]
 
-    # retrieve sources
     retriever = _vectorstore.as_retriever(search_kwargs={"k": payload.k or DEFAULT_K})
     docs = retriever.get_relevant_documents(payload.message)
     approved = [d for d in docs if _doc_approval_status.get(d.metadata.get("source"), False)]
 
     elapsed = time.time() - start
+    log_activity(f"💬 Chat message: {payload.message[:30]}...")
     return ChatResponse(
         response=result_text,
         department=payload.department,
         sources=[{"source": d.metadata.get("source")} for d in approved],
         elapsed_seconds=round(elapsed, 3)
     )
-
 
 @app.post("/chat_stream")
 async def chat_stream(payload: ChatRequest = Body(...)):
@@ -297,6 +290,7 @@ async def admin_chat(payload: ChatRequest = Body(...)):
     docs = retriever.get_relevant_documents(payload.message)
 
     elapsed = time.time() - start
+    log_activity(f"🛠️ Admin chat: {payload.message[:30]}...")
     return ChatResponse(
         response=result_text,
         department=payload.department,
@@ -305,28 +299,15 @@ async def admin_chat(payload: ChatRequest = Body(...)):
     )
 
 # -------------------- ADMIN DOC CONTROL --------------------
-@app.post("/upload_pdf", response_model=UploadResponse)
-async def upload_pdf(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDFs supported")
+@app.post("/upload_pdf_async")
+async def upload_pdf_async(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     content = await file.read()
-    temp_path = Path(TEMP_MD_DIR) / file.filename
-    temp_path.write_bytes(content)
+    upload_id = f"{file.filename}_{int(time.time())}"
+    upload_progress[upload_id] = {"status": "started", "progress": 0}
+    background_tasks.add_task(process_pdf_background, upload_id, content, file.filename)
 
-    text = extract_text_from_pdf(temp_path)
-    text = preprocess_text(text)
-    chunks = chunk_text(text)
-    if not chunks:
-        raise HTTPException(status_code=400, detail="No valid text extracted")
-
-    metadata = [{"source": file.filename, "chunk_id": i} for i in range(len(chunks))]
-    embed_and_store_fast(chunks, metadata)
-    _doc_approval_status[file.filename] = False
-
-    try: temp_path.unlink()
-    except: pass
-
-    return UploadResponse(message="Upload successful (awaiting approval)", num_chunks=len(chunks), stored_at=PERSIST_DIR)
+    log_activity(f"📤 Upload started: {file.filename}")
+    return {"upload_id": upload_id, "message": "Upload started"}
 
 async def process_pdf_background(upload_id: str, file_content: bytes, filename: str):
     try:
@@ -346,18 +327,13 @@ async def process_pdf_background(upload_id: str, file_content: bytes, filename: 
         _doc_approval_status[filename] = False
 
         upload_progress[upload_id] = {"status": "completed", "progress": 100, "num_chunks": len(chunks)}
-        try: temp_path.unlink()
-        except: pass
+        log_activity(f"✅ Upload completed: {filename}")
+        try:
+            temp_path.unlink()
+        except:
+            pass
     except Exception as e:
         upload_progress[upload_id] = {"status": "error", "error": str(e)}
-
-@app.post("/upload_pdf_async")
-async def upload_pdf_async(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    content = await file.read()
-    upload_id = f"{file.filename}_{int(time.time())}"
-    upload_progress[upload_id] = {"status": "started", "progress": 0}
-    background_tasks.add_task(process_pdf_background, upload_id, content, file.filename)
-    return {"upload_id": upload_id, "message": "Upload started"}
 
 @app.get("/upload_status/{upload_id}")
 def get_upload_status(upload_id: str):
@@ -368,6 +344,7 @@ def approve_doc(filename: str):
     if filename not in _doc_approval_status:
         raise HTTPException(status_code=404, detail="Doc not found")
     _doc_approval_status[filename] = True
+    log_activity(f"✔️ Approved: {filename}")
     return {"message": f"{filename} approved and now available to students"}
 
 @app.delete("/delete_doc/{filename}")
@@ -376,6 +353,7 @@ def delete_doc(filename: str):
     try:
         _vectorstore._collection.delete(where={"source": filename})
         _doc_approval_status.pop(filename, None)
+        log_activity(f"🗑️ Deleted: {filename}")
         return {"message": f"{filename} deleted from vectorstore"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
@@ -394,6 +372,7 @@ def test_retrieval(request: ChatRequest):
             for d in docs
         ]
     }
+
 @app.get("/documents")
 def list_documents():
     docs = []
@@ -404,50 +383,39 @@ def list_documents():
         })
     return docs
 
+@app.get("/recent_activities")
+def get_recent_activities():
+    return _activity_log
 
-# -------------------- VOICE CHAT --------------------
-# @app.post("/voice_chat")
-# async def voice_chat(file: UploadFile = File(...)):
-#     audio_path = Path(tempfile.mktemp(suffix=".wav"))
-#     audio_path.write_bytes(await file.read())
+# ------------------LOG-----------------
+# Option 1: raw string
+log_file = r"E:\INNERSIH\Auth\logs\app.log"
 
-#     # Speech-to-Text (Google)
-#     with open(audio_path, "rb") as f:
-#         audio = speech.RecognitionAudio(content=f.read())
+# Option 2: forward slashes (Python accepts these on Windows too)
+log_file = "E:/INNERSIH/Auth/logs/app.log"
 
-#     config = speech.RecognitionConfig(
-#         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-#         sample_rate_hertz=16000,
-#         language_code="pa-IN",  # can change dynamically
-#     )
+# Option 3: pathlib (cleanest)
+from pathlib import Path
+log_file = Path("E:/INNERSIH/Auth/logs/app.log")
+from fastapi import FastAPI
+from pathlib import Path
 
-#     response = speech_client.recognize(config=config, audio=audio)
-#     query = " ".join([r.alternatives[0].transcript for r in response.results])
 
-#     if not query.strip():
-#         return {"error": "No speech recognized"}
 
-#     # RAG + Gemini
-#     result_text = await run_gemini(query)
-
-#     # TTS response (Google)
-#     synthesis_input = texttospeech.SynthesisInput(text=result_text)
-#     voice = texttospeech.VoiceSelectionParams(
-#         language_code="pa-IN", ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL
-#     )
-#     audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
-
-#     tts_response = tts_client.synthesize_speech(
-#         input=synthesis_input, voice=voice, audio_config=audio_config
-#     )
-
-#     out_path = Path(tempfile.mktemp(suffix=".mp3"))
-#     out_path.write_bytes(tts_response.audio_content)
-
-#     try: audio_path.unlink()
-#     except: pass
-
-#     return FileResponse(out_path, media_type="audio/mpeg", filename="response.mp3")
+@app.get("/logs")
+def get_logs():
+    try:
+        log_file = Path("E:/INNERSIH/Auth/logs/app.log")  # <-- FIXED PATH
+        if not log_file.exists():
+            return {"error": f"log file not found at {log_file}"}
+        
+        with log_file.open("r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        last_logs = [line.strip() for line in lines if line.strip()][-5:]
+        return {"logs": last_logs}
+    except Exception as e:
+        return {"error": str(e)}
 
 # -------------------- RUN --------------------
 if __name__ == "__main__":
