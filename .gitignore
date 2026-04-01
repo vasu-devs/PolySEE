@@ -1,1 +1,57 @@
-backend/core/.env
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Videos
+*.mp4
+
+# Documents
+*.doc
+*.docx
+*.pptx
+*.pdf
+
+# Images folder
+Pics/
+
+# Backup/temp folders
+Auth_backup_nodejs/
+Auth_laravel/
+Auth_old_node/
+2nd/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Laravel
+Auth/storage/
+Auth/database/database.sqlite
+
+# ChromaDB binary data
+backend/core/chroma_db/
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Compiled / cache
+*.sqlite3
+*.cache

@@ -12,7 +12,7 @@ const Hero = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Navigation */}
       <nav className="flex justify-between items-center px-8 py-4 mb-15">
-        <div className="text-xl font-medium text-gray-900">Archon </div>
+        <div className="text-xl font-medium text-gray-900">PolySee :)</div>
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setIsSignupOpen(true)}
@@ -80,7 +80,7 @@ const Hero = () => {
 
           {/* Subtitle */}
           <p className="mt-8 text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Get instant, clear replies to queries on your university's official
+            Get instant, clear replies to queries on your  official
             documents
             <br />
             in a simplified easy-to-read format
@@ -149,11 +149,11 @@ const Hero = () => {
       {/* Build by students bla bla */}
       <div className="flex justify-center items-center space-x-4 mb-[100px]">
         <span className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full text-sm font-medium">
-          Build for Students
+          Build for MoE
         </span>
         <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
         <span className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full text-sm font-medium">
-          Backed by Admins
+          Backed by MoEcd
         </span>
         <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
         <span className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full text-sm font-medium">

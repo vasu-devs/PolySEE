@@ -28,7 +28,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-100 pl-10 pr-5">
       <div className="max-w-6xl mx-auto">
         {/* Stats Cards Grid */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
+        {/* <div className="grid grid-cols-2 gap-6 mb-8">
           <div className="bg-white p-8 rounded-xl shadow-sm">
             <div className="text-5xl font-bold text-black mb-3">100+</div>
             <div className="text-gray-700 font-medium">Documents</div>
@@ -50,7 +50,7 @@ const Dashboard = () => {
             <div className="text-5xl font-bold text-black mb-3">50+</div>
             <div className="text-gray-700 font-medium">Languages</div>
           </div>
-        </div>
+        </div> */}
 
         {/* Recent Activity Section */}
         {/* <div className="bg-white rounded-xl shadow-sm p-6"> */}

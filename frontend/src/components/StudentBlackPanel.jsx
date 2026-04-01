@@ -4,10 +4,10 @@ const StudentBlackPanel = ({ onSwitch }) => {
   return (
     <div className="absolute inset-0 p-8 flex flex-col justify-center">
       <div className="max-w-full">
-        <h1 className="text-3xl font-bold mb-4">Student Portal</h1>
+        <h1 className="text-3xl font-bold mb-4">User Portal</h1>
         
         <p className="text-gray-300 text-sm mb-6 leading-relaxed">
-          Get instant answers to your academic questions through our intelligent AI assistant. 
+          Get instant answers to your questions through our intelligent AI assistant. 
           Access policies, procedures, and get personalized guidance for your educational journey.
         </p>
 

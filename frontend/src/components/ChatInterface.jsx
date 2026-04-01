@@ -250,11 +250,11 @@ const ChatInterface = () => {
       {/* Header */}
       <div className="flex justify-between items-center px-8 py-4 bg-gray-100 border-b border-gray-200 z-20 relative">
         <span className="px-3 py-1 bg-white rounded-md text-sm font-normal shadow">
-          Computer Science Department
+          Ministry of Education
         </span>
         <span className="text-sm text-gray-400 mx-auto">
           Emergency contacts | Phone: +91 1800 123 0001 | Email:
-          helpdesk@polyuni.edu
+          helpdesk@PolySee.edu
         </span>
 
         {/* Profile Dropdown */}

@@ -23,7 +23,7 @@ const FeatureCards = () => {
         <div className="flex flex-col h-full">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">
-              5 Language
+              50+ Languages
             </h3>
             <p className="text-sm text-gray-500">
               Multi Linguistic Interaction

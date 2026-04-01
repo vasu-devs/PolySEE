@@ -389,14 +389,14 @@ def get_recent_activities():
 
 # ------------------LOG-----------------
 # Option 1: raw string
-log_file = r"E:\INNERSIH\Auth\logs\app.log"
+log_file = r"E:\Hackathons\INNERSIH\Auth\logs\app.log"
 
 # Option 2: forward slashes (Python accepts these on Windows too)
-log_file = "E:/INNERSIH/Auth/logs/app.log"
+log_file = "E:/Hackathons/INNERSIH/Auth/logs/app.log"
 
 # Option 3: pathlib (cleanest)
 from pathlib import Path
-log_file = Path("E:/INNERSIH/Auth/logs/app.log")
+log_file = Path("E:/Hackathons/INNERSIH/Auth/logs/app.log")
 from fastapi import FastAPI
 from pathlib import Path
 
@@ -405,7 +405,7 @@ from pathlib import Path
 @app.get("/logs")
 def get_logs():
     try:
-        log_file = Path("E:/INNERSIH/Auth/logs/app.log")  # <-- FIXED PATH
+        log_file = Path("E:/Hackathons/INNERSIH/Auth/logs/app.log")  # <-- FIXED PATH
         if not log_file.exists():
             return {"error": f"log file not found at {log_file}"}
         
